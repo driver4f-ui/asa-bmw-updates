@@ -1,0 +1,31 @@
+name: Publish ASA BMW v1.10.4 (one-time)
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-asa-v1104.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_REPO: driver4f-ui/asa-bmw-updates
+      GH_TOKEN: ${{ github.token }}
+      ASSET_URL: "https://sdmntprdenmarkeast.oaiusercontent.com/files/00000000-8864-8210-94f3-ad5633430f96/raw?se=2026-11-21T09%3A12%3A45Z&sp=r&sv=2026-06-06&sr=b&scid=9f6741d5-756b-5dc5-9231-86a5a40c58db&skoid=9b41a688-1b44-4731-856e-b0efcf3660ed&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-21T06%3A30%3A50Z&ske=2026-11-22T06%3A30%3A50Z&sks=b&skv=2026-06-06&sig=4JIXpL8BdFT4YfDMGnFjFY%2BH4zwUFuYpknC0gQ8nWLk%3D"
+    steps:
+      - name: Download signed Windows artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 --max-time 240 "$ASSET_URL" -o artifact.zip
+          echo 'd802c678695ac24ffbbc93dbf2dcaec1f80216a00e59cb9305d7ed0bf02d42a0  artifact.zip' | sha256sum -c -
+          unzip -p artifact.zip ASA_BMW_v1.10.4_WINDOWS_UPDATE.zip > ASA_BMW_v1.10.4_WINDOWS_UPDATE.zip
+          echo '4e951c4089012bd8afbf6a18db1eedbc9c561f24eefdccae937f5495d92a95f6  ASA_BMW_v1.10.4_WINDOWS_UPDATE.zip' | sha256sum -c -
+          gh release create v1.10.4 ASA_BMW_v1.10.4_WINDOWS_UPDATE.zip \
+            --title 'ASA BMW v1.10.4' \
+            --notes 'Poprawka aktualizacji przy starcie: po Tak program nie porzuca pobierania podczas automatycznego laczenia z pojazdem. EXE i rollback przetestowane na Windows.' \
+            --latest
