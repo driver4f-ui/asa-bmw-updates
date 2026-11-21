@@ -1,0 +1,31 @@
+name: Publish ASA BMW v1.10.7 (one-time)
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-asa-v1107.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_REPO: driver4f-ui/asa-bmw-updates
+      GH_TOKEN: ${{ github.token }}
+      ASSET_URL: "https://sdmntprnortheu.oaiusercontent.com/files/00000000-0800-81f4-8e3a-a9d34c8318f7/raw?se=2026-11-21T10%3A31%3A10Z&sp=r&sv=2026-06-06&sr=b&scid=43fc0684-b4a6-516e-838f-61bc5f565f6a&skoid=9b41a688-1b44-4731-856e-b0efcf3660ed&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-21T05%3A16%3A08Z&ske=2026-11-22T05%3A16%3A08Z&sks=b&skv=2026-06-06&sig=HX7mfOf17Ab89O%2BJIS8Dpga9Z%2BPSVL5jKJkPYlh%2BKxc%3D"
+    steps:
+      - name: Download and verify ASA BMW v1.10.7 Windows package
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 --max-time 240 "$ASSET_URL" -o artifact.zip
+          echo '1678e282876c62aad603d551b872a1b509febb4af50c15de78a8f82fc3c6cb86  artifact.zip' | sha256sum -c -
+          unzip -p artifact.zip ASA_BMW_v1.10.7_WINDOWS_UPDATE.zip > ASA_BMW_v1.10.7_WINDOWS_UPDATE.zip
+          echo 'fdde520cc55ef2a74b12fcf89081585bf84e7ad0fb6a577c4446fb153c91077b  ASA_BMW_v1.10.7_WINDOWS_UPDATE.zip' | sha256sum -c -
+          gh release create v1.10.7 ASA_BMW_v1.10.7_WINDOWS_UPDATE.zip \
+            --title 'ASA BMW v1.10.7' \
+            --notes 'Nowe okno z procentowym postepem pobierania i rozpakowywania. Postep instalacji EXE w osobnym oknie. Zwarty wybor kolejnosci zapisu obok Zaznacz wszystko. Zachowana kopia i przywracanie poprzedniej wersji.' \
+            --latest
