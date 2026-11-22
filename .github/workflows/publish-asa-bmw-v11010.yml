@@ -1,0 +1,59 @@
+name: Publish verified ASA BMW v1.10.10 (one-time)
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-asa-bmw-v11010.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ARTIFACT_URL: "https://sdmntprukwest.oaiusercontent.com/files/00000000-8fb0-8243-8237-329b480d193f/raw?se=2026-11-22T18%3A19%3A58Z&sp=r&sv=2026-06-06&sr=b&scid=7131289e-a66e-5153-bcb9-947f193a4155&skoid=9b41a688-1b44-4731-856e-b0efcf3660ed&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-22T07%3A29%3A58Z&ske=2026-11-23T07%3A29%3A58Z&sks=b&skv=2026-06-06&sig=IygvSUCD6JS74XYPVdTflP4LXKe20aoq6EFUZ70dcT0%3D"
+      BUNDLE_SHA256: "6582ed4b2bc4c3c57af6a2ef70d26a07ae2249174398a5fd35a4e7cfeaf7f897"
+    steps:
+      - name: Retrieve and verify tested Windows CI package
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 4 --retry-delay 3 --max-time 240 "$ARTIFACT_URL" -o artifact.zip
+          echo "$BUNDLE_SHA256  artifact.zip" | sha256sum -c -
+          mkdir -p release
+          unzip -q artifact.zip -d release
+          cd release
+          sha256sum -c ASA-BMW-Setup-v1.10.10.exe.sha256
+          sha256sum -c ASA_BMW_v1.10.10_WINDOWS_UPDATE.zip.sha256
+          test "$(head -c 2 ASA-BMW-Setup-v1.10.10.exe)" = "MZ"
+          test "$(unzip -Z1 ASA_BMW_v1.10.10_WINDOWS_UPDATE.zip)" = "ASA-AUTO-SERVICE-Ryznar.exe"
+          test "$(stat -c%s ASA-BMW-Setup-v1.10.10.exe)" -ge 1000000
+      - name: Publish complete GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd release
+          cat > notes.txt <<'NOTES'
+          ASA Książka Serwisowa BMW v1.10.10
+
+          - Domyślna nazwa programu: ASA Książka Serwisowa BMW.
+          - Nowa nazwa na pasku tytułu, w instalatorze, menu Start, na pulpicie i w systemowej liście aplikacji.
+          - Usunięcie starego skrótu ASA BMW, pozostaje jeden skrót do nowego programu.
+          - Nowa nazwa w oknie Co nowego po aktualizacji.
+          - Zachowano wewnętrzną nazwę EXE, AppId oraz katalog danych i ustawień.
+          - Pakiet ZIP umożliwia automatyczne przejście ze starszych wersji, Setup instaluje pełną aplikację.
+          - Testy Windows: kompilacja, instalacja i ponowna instalacja, kontrola skrótów i SHA-256 — PASS.
+          NOTES
+          gh release create v1.10.10 \
+            ASA-BMW-Setup-v1.10.10.exe \
+            ASA-BMW-Setup-v1.10.10.exe.sha256 \
+            ASA_BMW_v1.10.10_WINDOWS_UPDATE.zip \
+            ASA_BMW_v1.10.10_WINDOWS_UPDATE.zip.sha256 \
+            --repo driver4f-ui/asa-bmw-updates \
+            --title 'ASA Książka Serwisowa BMW v1.10.10' \
+            --notes-file notes.txt --latest
+          gh api repos/driver4f-ui/asa-bmw-updates/releases/latest --jq '.tag_name' | grep -Fx v1.10.10
