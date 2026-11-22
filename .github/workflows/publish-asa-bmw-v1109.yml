@@ -1,0 +1,59 @@
+name: Publish verified ASA BMW v1.10.9 (one-time)
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-asa-bmw-v1109.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ARTIFACT_URL: "https://sdmntprukwest.oaiusercontent.com/files/00000000-0f54-8243-a5fa-6b33a5e95a29/raw?se=2026-11-22T18%3A04%3A07Z&sp=r&sv=2026-06-06&sr=b&scid=417508dc-7527-52b0-b350-7b86b757eb45&skoid=9b41a688-1b44-4731-856e-b0efcf3660ed&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-22T07%3A19%3A23Z&ske=2026-11-23T07%3A19%3A23Z&sks=b&skv=2026-06-06&sig=lh/WqEYqWqJPgBSCaXMU/Yprm0Sd0%2BpQmKn1upY8QXA%3D"
+      BUNDLE_SHA256: "c40bbad15b0c31b54d577b4138ef993609bf72ef08b3c415645cb3143e9c225a"
+    steps:
+      - name: Retrieve tested Windows CI package
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 4 --retry-delay 3 --max-time 240 "$ARTIFACT_URL" -o artifact.zip
+          echo "$BUNDLE_SHA256  artifact.zip" | sha256sum -c -
+          mkdir -p release
+          unzip -q artifact.zip -d release
+          cd release
+          sha256sum -c ASA-BMW-Setup-v1.10.9.exe.sha256
+          sha256sum -c ASA_BMW_v1.10.9_WINDOWS_UPDATE.zip.sha256
+          test "$(head -c 2 ASA-BMW-Setup-v1.10.9.exe)" = "MZ"
+          test "$(unzip -Z1 ASA_BMW_v1.10.9_WINDOWS_UPDATE.zip)" = "ASA-AUTO-SERVICE-Ryznar.exe"
+          test "$(stat -c%s ASA-BMW-Setup-v1.10.9.exe)" -ge 1000000
+      - name: Publish complete GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd release
+          cat > notes.txt <<'NOTES'
+          ASA BMW Service History Manager v1.10.9
+
+          - Nowy polski instalator ASA-BMW-Setup dla Windows (Inno Setup).
+          - Pełne biblioteki programu w instalowanym folderze.
+          - Automatyczne sprawdzanie aktualizacji przy starcie i co 6 godzin.
+          - Pobieranie instalatora z weryfikacją SHA-256 oraz restart programu.
+          - Okno „Co nowego” po instalacji aktualizacji i przycisk OK.
+          - Zachowanie lokalnej książki serwisowej i ustawień.
+          - Pakiet zgodności ZIP dla aktualizacji z v1.10.8.
+          Testy Windows: kompilacja EXE, instalacja i ponowna instalacja zakończone pozytywnie.
+          NOTES
+          gh release create v1.10.9 \
+            ASA-BMW-Setup-v1.10.9.exe \
+            ASA-BMW-Setup-v1.10.9.exe.sha256 \
+            ASA_BMW_v1.10.9_WINDOWS_UPDATE.zip \
+            ASA_BMW_v1.10.9_WINDOWS_UPDATE.zip.sha256 \
+            --title 'ASA BMW v1.10.9 — pełny instalator Windows' \
+            --notes-file notes.txt --latest
+          gh api repos/driver4f-ui/asa-bmw-updates/releases/latest --jq '.tag_name' | grep -Fx v1.10.9
