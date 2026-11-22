@@ -55,5 +55,5 @@ jobs:
             ASA_BMW_v1.10.9_WINDOWS_UPDATE.zip \
             ASA_BMW_v1.10.9_WINDOWS_UPDATE.zip.sha256 \
             --title 'ASA BMW v1.10.9 — pełny instalator Windows' \
-            --notes-file notes.txt --latest
+            --repo driver4f-ui/asa-bmw-updates --notes-file notes.txt --latest
           gh api repos/driver4f-ui/asa-bmw-updates/releases/latest --jq '.tag_name' | grep -Fx v1.10.9
