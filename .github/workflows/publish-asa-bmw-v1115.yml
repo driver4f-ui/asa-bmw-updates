@@ -1,0 +1,60 @@
+name: Publish verified ASA BMW v1.11.5 (one-time)
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-asa-bmw-v1115.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ARTIFACT_URL: "https://sdmntprukwest.oaiusercontent.com/files/00000000-a7ac-8243-8835-a64142e8f518/raw?se=2026-11-22T19%3A51%3A31Z&sp=r&sv=2026-06-06&sr=b&scid=ff2e115e-4f28-5588-8860-4ac9da6dd49e&skoid=9b41a688-1b44-4731-856e-b0efcf3660ed&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-22T06%3A56%3A56Z&ske=2026-11-23T06%3A56%3A56Z&sks=b&skv=2026-06-06&sig=JKHzW83an9EbmQ01aNJN7HPRStKcyIuaI4rtwmRaiCU%3D"
+      BUNDLE_SHA256: "e1d38a56469fd961c74bdd2fb764033efeb4f8cd3acd4e1730600a704fdd8f95"
+    steps:
+      - name: Retrieve and verify tested Windows installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 4 --retry-delay 3 --max-time 240 "$ARTIFACT_URL" -o artifact.zip
+          echo "$BUNDLE_SHA256  artifact.zip" | sha256sum -c -
+          mkdir -p release
+          unzip -q artifact.zip -d release
+          cd release
+          sha256sum -c ASA-BMW-Setup-v1.11.5.exe.sha256
+          sha256sum -c ASA_BMW_v1.11.5_WINDOWS_UPDATE.zip.sha256
+          test "$(head -c 2 ASA-BMW-Setup-v1.11.5.exe)" = "MZ"
+          test "$(unzip -Z1 ASA_BMW_v1.11.5_WINDOWS_UPDATE.zip)" = "ASA-AUTO-SERVICE-Ryznar.exe"
+          test "$(stat -c%s ASA-BMW-Setup-v1.11.5.exe)" -ge 1000000
+      - name: Publish verified delayed release notes update
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd release
+          cat > notes.txt <<'NOTES'
+          ASA Książka Serwisowa BMW v1.11.5
+
+          - Przed pobraniem/instalacją aktualizacji wyświetla się wyłącznie numer nowej wersji i pytanie o pobranie.
+          - Nie wyświetlamy listy zmian ani w oknie potwierdzenia, ani w statusie aktualizatora.
+          - Opis „Co nowego” pojawia się dopiero po pomyślnym zainstalowaniu aktualizacji i ponownym uruchomieniu programu.
+          - Po zatwierdzeniu przyciskiem OK opis zmian nie wraca dla tej samej wersji.
+          - Dodano test regresji chroniący przed wcześniejszym pokazaniem opisu zmian.
+          - Nie zmieniono połączenia ENET/ICOM, importu BMW AOS, odczytu napięcia, historii HU i weryfikacji SHA-256.
+          - Zapisano pełną kopię v1.11.4 przed zmianą na gałęzi backup.
+          - Testy Windows: unittest, pełny EXE, instalator Inno Setup, instalacja i ponowna instalacja — PASS.
+          NOTES
+          gh release create v1.11.5 \
+            ASA-BMW-Setup-v1.11.5.exe \
+            ASA-BMW-Setup-v1.11.5.exe.sha256 \
+            ASA_BMW_v1.11.5_WINDOWS_UPDATE.zip \
+            ASA_BMW_v1.11.5_WINDOWS_UPDATE.zip.sha256 \
+            --repo driver4f-ui/asa-bmw-updates \
+            --title 'ASA Książka Serwisowa BMW v1.11.5' \
+            --notes-file notes.txt --latest
+          gh api repos/driver4f-ui/asa-bmw-updates/releases/latest --jq '.tag_name' | grep -Fx v1.11.5
